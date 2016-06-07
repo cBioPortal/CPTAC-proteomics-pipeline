@@ -1,13 +1,19 @@
+import argparse
 import re
 import pandas as pd
 
+# set argparser
+parser = argparse.ArgumentParser(description='This script creates an annotation file for RefSeq protein/transcript IDs, HUGO symbols, and Entrez gene IDs.')
+parser.add_argument('-r', metavar='refseq-folder/', help='folder with RefSeq *.gpff files', required=True)
+parser.add_argument('-o', metavar='out-file', help='filename for output file', required=True)
+args = parser.parse_args()
 
 def process_refseq(chrom):
     refprot = []
     refmrna = []
     refgene = []
     refentz = []
-    with open('refseq/human.{0}.protein.gpff'.format(chrom), 'r') as f:
+    with open(args.r + 'human.{0}.protein.gpff'.format(chrom), 'r') as f:
         block = []
         for line in f:
             line = line.strip()
@@ -48,6 +54,6 @@ for chrom in range(1, 27):
     print 'Done', chrom
 
 refseq = pd.DataFrame({'Protein': all_refprot, 'mRNA': all_refmrna, 'Gene': all_refgene, 'Entrez': all_refentz})
-refseq.to_csv('RefSeqIDs.tsv', sep='\t', header=True, index=False)
+refseq.to_csv(args.o, sep='\t', header=True, index=False)
 
 
