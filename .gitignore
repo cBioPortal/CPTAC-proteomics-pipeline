@@ -1,0 +1,8 @@
+# ignore these
+download/
+refseq/
+data/
+resources/
+*.*~
+*.pyc
+*.tsv
