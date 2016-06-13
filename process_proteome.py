@@ -27,9 +27,9 @@ if args.p == 'itraq':
     new_exp = np.exp2(exp[[col for col in exp.columns if re.match(sample_regex + ' Log Ratio', col)]])
 elif args.p == 'precursor_area':
     new_cols = [col for col in exp.columns if re.match(sample_regex + ' Area', col)]
-    new_exp = exp[new_cols].div(exp[new_cols].mean(axis=1), axis=0)
+    new_exp = np.log2(exp[new_cols]).div(np.log2(exp[new_cols].mean(axis=1)), axis=0)
 
-# annotate phosphosites with hugo
+# annotate with hugo
 prot_anno = pd.read_csv(args.a, sep='\t', header=0, dtype='str')
 prot_anno = prot_anno.drop_duplicates('Gene')
 gene2entz = dict(zip(prot_anno['Gene'], prot_anno['Entrez']))
