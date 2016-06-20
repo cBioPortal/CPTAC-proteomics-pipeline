@@ -87,9 +87,9 @@ def main(args):
         prot_data.append(prot_df)
     
     ptm_data = []
-    for ptm_fname in args.ptm_files.split(','):
+    for ptm_fname, ptm_prefix in zip(args.ptm_files.split(','), args.ptm_prefixes.split(',')):
         ptm_df = load_transform_data(ptm_fname, args.ptm_pipeline)
-        ptm_df = annotate_ptm(ptm_df, args.annotation, args.ptm_prefix)
+        ptm_df = annotate_ptm(ptm_df, args.annotation, ptm_prefix)
         ptm_data.append(ptm_df)
     
     comb_df = combine_data(prot_data + ptm_data)
@@ -121,9 +121,9 @@ if __name__ == '__main__':
         choices=('itraq', 'precursor_area'), 
         help='processing pipeline (i.e. "itraq" for Breast and Ovarian, "precursor_area for Colon")', 
         required=True)
-    parser.add_argument('--ptm-prefix', 
-        choices=('p'), 
-        help='p=phosphosite, etc.', 
+    parser.add_argument('--ptm-prefixes', 
+        metavar='<prefix_1,prefix_2,prefix_n>',
+        help='a comma-separated list of letters indicating the class of PTM of each PTM file, where p=phosphosite, etc. (i.e. p,p,p)', 
         required=True)
     parser.add_argument('--annotation', 
         metavar='<annotation-file>', 
