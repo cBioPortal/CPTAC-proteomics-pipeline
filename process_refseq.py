@@ -4,8 +4,8 @@ import pandas as pd
 
 # set argparser
 parser = argparse.ArgumentParser(description='This script creates an annotation file for RefSeq protein/transcript IDs, HUGO symbols, and Entrez gene IDs.')
-parser.add_argument('-r', metavar='refseq-folder/', help='folder with RefSeq *.gpff files', required=True)
-parser.add_argument('-o', metavar='out-file', help='filename for output file', required=True)
+parser.add_argument('-r', metavar='<refseq-folder/>', help='folder with RefSeq *.gpff files', required=False)
+parser.add_argument('-o', metavar='<out-file>', help='filename for output file', required=False)
 args = parser.parse_args()
 
 def process_refseq(chrom):
