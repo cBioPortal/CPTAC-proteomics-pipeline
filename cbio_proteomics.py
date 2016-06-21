@@ -20,6 +20,7 @@ def load_transform_data(fname, pipeline,
         df = np.log2(df[new_cols])
     
     df.columns = ['TCGA-'+re.match(sample_regex, col).group(1) for col in df.columns]
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)
     df.fillna(0, inplace=True)
     return df
 
@@ -96,7 +97,7 @@ def main(args):
         
         comb_df = combine_data(prot_data + ptm_data)
     elif any(ptm_params) and not all(ptm_params):
-        raise RuntimeError('Attempting to process PTMs without all arguments set.')
+        raise RuntimeError('Attempting to process PTMs without all arguments set (--ptm-files, --ptm_pipeline, --ptm-prefixes).')
     else:
         comb_df = combine_data(prot_data)
     

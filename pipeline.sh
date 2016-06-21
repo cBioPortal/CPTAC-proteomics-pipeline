@@ -20,7 +20,27 @@ python cbio_proteomics.py \
 --ptm-pipeline itraq \
 --ptm-prefix p \
 --annotation refseq.tsv \
---output-file data/data_protein_level.txt \
---meta-file data/meta_protein_level.txt \
+--output-file data/data_breast_protein_level.txt \
+--meta-file data/meta_breast_protein_level.txt \
 --cancer-id brca_tcga_pub
+
+python cbio_proteomics.py \
+--proteome-files download/TCGA_Ovarian_JHU_Proteome_CDAP.r2.itraq.tsv,download/TCGA_Ovarian_PNNL_Proteome_CDAP.r2.itraq.tsv \
+--proteome-pipeline itraq \
+--ptm-files download/TCGA_Ovarian_PNNL_Phosphoproteome.phosphosite.itraq.tsv \
+--ptm-pipeline itraq \
+--ptm-prefix p \
+--annotation refseq.tsv \
+--output-file data/data_ovarian_protein_level.txt \
+--meta-file data/meta_ovarian_protein_level.txt \
+--cancer-id ov_tcga
+
+python cbio_proteomics.py \
+--proteome-files download/TCGA_Colon_VU_Proteome_CDAP.r2.precursor_area.tsv \
+--proteome-pipeline precursor_area \
+--annotation refseq.tsv \
+--output-file data/data_colorectal_protein_level.txt \
+--meta-file data/meta_colorectal_protein_level.txt \
+--cancer-id coadread_tcga
+
 
