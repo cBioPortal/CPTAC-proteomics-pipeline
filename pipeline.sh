@@ -7,7 +7,7 @@ mkdir -p refseq
 mkdir -p resources
 
 wget ftp://ftp.ncbi.nih.gov/refseq/H_sapiens/mRNA_Prot/human.*.protein.gpff.gz -P refseq/
-python process_refseq.py -r refseq -o refseq.tsv
+python process_refseq.py --refseq-folder refseq/ --output-file refseq.tsv
 
 wget -i http_breast.txt -P download/
 wget -i http_ovarian.txt -P download/
