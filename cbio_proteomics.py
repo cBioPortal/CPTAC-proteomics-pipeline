@@ -14,14 +14,13 @@ def load_transform_data(fname, pipeline,
     
     if pipeline == 'itraq':
         new_cols = [col for col in df.columns if re.match(sample_regex + ' Log Ratio', col)]
-        df = np.exp2(df[new_cols])
+        df = df[new_cols]
     elif pipeline == 'precursor_area':
         new_cols = [col for col in df.columns if re.match(sample_regex + ' Area', col)]
         df = np.log2(df[new_cols])
     
     df.columns = ['TCGA-'+re.match(sample_regex, col).group(1) for col in df.columns]
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    df.fillna(0, inplace=True)
     return df
 
 
@@ -62,8 +61,19 @@ def annotate_ptm(df, anno_file, ptm_prefix):
     return df
 
 
+def average_duplicates(df):
+    nondup_df = df[df.columns[~df.columns.duplicated(keep=False)]]
+    uniq_dup_cols = list(set(df.columns[df.columns.duplicated(keep=False)]))
+    dedup_df = pd.DataFrame(index=nondup_df.index, columns=uniq_dup_cols)
+    for col in uniq_dup_cols:
+        dedup_df[col] = df[col].mean(axis=1)
+    df = pd.concat((nondup_df, dedup_df), axis=1)
+    return df
+
+
 def combine_data(df_list):
-    df = pd.concat(df_list, axis=0)
+    df = pd.concat(df_list, axis=1)
+    df = average_duplicates(df)
     df.index.names = ['Hugo_Symbol']
     return df
 
@@ -86,7 +96,6 @@ def main(args):
         prot_df = load_transform_data(prot_fname, args.proteome_pipeline)
         prot_df = annotate_gene(prot_df)
         prot_data.append(prot_df)
-    
     ptm_params = (args.ptm_files, args.ptm_pipeline, args.ptm_prefixes)
     if all(ptm_params):
         ptm_data = []
@@ -94,17 +103,16 @@ def main(args):
             ptm_df = load_transform_data(ptm_fname, args.ptm_pipeline)
             ptm_df = annotate_ptm(ptm_df, args.annotation, ptm_prefix)
             ptm_data.append(ptm_df)
-        
-        comb_df = combine_data(prot_data + ptm_data)
+        total_prot_df = combine_data(prot_data)
+        total_ptm_df = combine_data(ptm_data)
+        comb_df = pd.concat((total_prot_df, total_ptm_df), axis=0)
     elif any(ptm_params) and not all(ptm_params):
         raise RuntimeError('Attempting to process PTMs without all arguments set (--ptm-files, --ptm_pipeline, --ptm-prefixes).')
     else:
         comb_df = combine_data(prot_data)
-    
     comb_df.to_csv(args.output_file, sep='\t', header=True, index=True)
     with open(args.meta_file, 'w') as f:
         f.write(write_meta(args.cancer_id, args.output_file))
-    
     return
 
 
@@ -151,4 +159,3 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     main(args)
-
