@@ -82,10 +82,10 @@ def write_meta(cancer_id, output_file):
     blurb = """cancer_study_identifier: {0}
 genetic_alteration_type: PROTEIN_LEVEL
 datatype: Z-SCORE
-stable_id: ms_abundance
-profile_description: Protein levels (mass spectrometry)
+stable_id: protein_quantification
+profile_description: Protein Quantification (Mass Spec)
 show_profile_in_analysis_tab: true
-profile_name: Protein levels (mass spectrometry)
+profile_name: Protein levels (mass spectrometry by CPTAC)
 data_filename: {1}""".format(cancer_id, output_file.split('/')[-1])
     return blurb
 
@@ -93,14 +93,14 @@ data_filename: {1}""".format(cancer_id, output_file.split('/')[-1])
 def main(args):
     prot_data = []
     for prot_fname in args.proteome_files.split(','):
-        prot_df = load_transform_data(prot_fname, args.proteome_pipeline)
+        prot_df = load_transform_data(prot_fname, args.proteome_pipeline, sample_regex=args.sample_regex)
         prot_df = annotate_gene(prot_df)
         prot_data.append(prot_df)
     ptm_params = (args.ptm_files, args.ptm_pipeline, args.ptm_prefixes)
     if all(ptm_params):
         ptm_data = []
         for ptm_fname, ptm_prefix in zip(args.ptm_files.split(','), args.ptm_prefixes.split(',')):
-            ptm_df = load_transform_data(ptm_fname, args.ptm_pipeline)
+            ptm_df = load_transform_data(ptm_fname, args.ptm_pipeline, sample_regex=args.sample_regex)
             ptm_df = annotate_ptm(ptm_df, args.annotation, ptm_prefix)
             ptm_data.append(ptm_df)
         total_prot_df = combine_data(prot_data)
@@ -128,6 +128,11 @@ if __name__ == '__main__':
         choices=('itraq', 'precursor_area'), 
         help='processing pipeline (i.e. "itraq" for Breast and Ovarian, "precursor_area for Colon")', 
         required=True)
+    parser.add_argument('--sample-regex', 
+        choices=('itraq', 'precursor_area'), 
+        help='regular expression for sample names (i.e. "([A-Z0-9]{2}\-[A-Z0-9]{4}\-[A-Z0-9]{2})[A-Z0-9\-]+)"', 
+        default='([A-Z0-9]{2}\-[A-Z0-9]{4}\-[A-Z0-9]{2})[A-Z0-9\-]+',
+        required=False)
     parser.add_argument('--ptm-files', 
         metavar='<filename_1,filename_2,filename_n>', 
         help='comma-separated list of PTM filenames', 
@@ -159,3 +164,4 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     main(args)
+
