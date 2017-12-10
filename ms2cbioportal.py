@@ -1,6 +1,7 @@
 import abc
 import argparse
 import re
+import pickle
 import numpy as np
 import pandas as pd
 
@@ -37,6 +38,11 @@ class MSTable(object):
     __metaclass__  = abc.ABCMeta
     
     def __init__(self, filename, sample_regex, ptm_type=None, use_ruler=False):
+        # these are private attributes
+        self.use_ruler = use_ruler
+        self.self_path = __file__.split('/')[0] + '/'
+        
+        # these are public attributes
         self.df = pd.DataFrame()
         
         # read in data from csv file
@@ -46,16 +52,32 @@ class MSTable(object):
         self.check_data()
         
         # clean and format the data
-        self.format_genes(ptm_type)
         self.clean_rows()
+        self.format_genes(ptm_type)
         self.clean_columns(sample_regex)
-        self.average_duplicates()
         self.clean_values()
+        self.average_duplicates()
+        
+        # transform data
+        if use_ruler:
+            self.proteomic_ruler()
     
     def __repr__(self):
         return str(self.df)
     
-    def head(self, n):
+    @property
+    def columns(self):
+        return self.df.columns
+    
+    @property
+    def index(self):
+        return self.df.index
+    
+    @property
+    def shape(self):
+        return self.df.shape
+    
+    def head(self, n=5):
         """A wrapper for Pandas' `head` method.
         
         Parameters
@@ -69,7 +91,6 @@ class MSTable(object):
             The top `n` rows of the dataframe.
         """
         head = self.df.head(n)
-        print(head)
         return head
     
     def load_data(self, filename):
@@ -87,7 +108,6 @@ class MSTable(object):
         """
         try:
             self.df = pd.read_csv(filename, sep='\t', header=0)
-            self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
         except OSError:
             print('File {0} not found. Could not be converted into a Pandas dataframe.').format(filename)
             raise
@@ -131,8 +151,7 @@ class MSTable(object):
         return
     
     def clean_values(self):
-        """Clean the data of `np.inf` and/or log transform, depending
-        on the experiment type. Optionally should be overloaded.
+        """Clean the data of `np.inf`.
         
         Parameters
         ----------
@@ -142,25 +161,67 @@ class MSTable(object):
         -------
         None
         """
+        self.df.replace((np.inf, -np.inf), np.nan, inplace=True)
         return
     
-    def protemic_ruler(self, use_ruler=False):
-        """Apply the proteomic ruler to the data to obtain copy number
-        per cell estimates. Uses the formula:
+    def log_transform(self):
+        """Log2 transform data.
         
-        Protein Copy Number = Protein MS Signal x (Molar Mass/Avogadro's Number)
+        Parameters
+        ----------
+        None
+        
+        Returns
+        -------
+        None
+        """
+        self.df = np.log2(self.df + 1)
+        return
+    
+    def proteomic_ruler(self):
+        """Apply the proteomic ruler to the data to obtain copy number
+        per cell estimates based on Wiśniewski et al. 2014. Uses the formula:
+        
+        Protein Copy Number = Protein MS Signal x (Avogadro's Number/Molar Mass)
                                                 x (DNA Mass/Histone MS Signal)
         
         Parameters
         ----------
-        use_ruler : bool
-            If `True`, apply the ruler method.
+        None
         
         Returns
         -------
         None
         """
         
+        # check for negative values
+        min_val = np.nanmin(self.df.values)
+        if min_val < 0:
+            raise ValueError("""Negative values detected. Proteomic ruler only supports MS intensity values. 
+                                If this is a mistake, set use_ruler=False.""")
+        
+        # load some constants
+        molar_mass = pickle.load(open(self.self_path + 'molar_mass.pkl', 'rb'))
+        avogadro = 6.022 * 10**23
+        dna_mass = 6.5 * 10**-12 # 6.5 pg
+        
+        # get col of avogadro/molar mass
+        molar_col = []
+        for ind in self.df.index:
+            try:
+                molar_col.append(molar_mass[ind.split('|')[0]])
+            except KeyError:
+                molar_col.append(np.nan)
+        
+        molar_col = pd.Series(molar_col)
+        molar_col.index = self.df.index
+        avo_mol = molar_col.rtruediv(avogadro)
+        
+        # get row of sum of histones
+        hist_row = self.df[self.df.index.to_series().str.contains('HIST', na=False)].sum()
+        
+        # apply equation
+        self.df = self.df.div(hist_row).multiply(avo_mol, axis=0).multiply(dna_mass)
         return
     
     def average_duplicates(self):
@@ -213,6 +274,24 @@ class MSTable(object):
         None
         """
         self.df = pd.concat((self.df, table.df), axis=0)
+        return
+    
+    def horizontal_concat(self, table):
+        """Concatenate data from two experiments together by horizontal concatenation.
+        This is for combining the same experiment type but with two (or more, since
+        you can chain the concatenation) sample sets.
+        
+        Parameters
+        ----------
+        table : ms2cbioportal.MSTable
+            An instance derived from `MSTable`.
+        
+        Returns
+        -------
+        None
+        """
+        self.df = pd.concat((self.df, table.df), axis=1)
+        return
     
     def write_csv(self, filename):
         """Write finished DataFrame to file.
@@ -271,12 +350,12 @@ class CDAPTable(MSTable):
     
     def format_genes(self, ptm_type):
         """Method that rewrites the gene column and sets it as the index. First checks
-        to see if the table is a PTM by checking for 'Phosphosite' (only phosphosites
-        supported at this time for CDAP). Phosphosites are built using the format
+        to see if the table is a PTM by checking for the associated name (only phosphosites
+        supported at this time for CDAP). PTMs are built using the format
         
-        GENE|GENE_P<ptm_type><amino acid site>
+        GENE|GENE_<ptm_type><amino acid><amino acid site>
         
-        Multi-site phosphosites are chained with underscores. Otherwise, the gene is
+        Multi-site PTMs are chained with underscores. Otherwise, the gene is
         formatted as
         
         GENE|GENE
@@ -290,9 +369,13 @@ class CDAPTable(MSTable):
         -------
         None
         """
-        if 'Phosphosite' in self.df.columns:
+        ptm_name = {
+            'P' : 'Phosphosite',
+        }
+        
+        if ptm_type and ptm_name[ptm_type] in self.df.columns:
             anno = []
-            for g, ph in zip(self.df['Gene'], self.df['Phosphosite']):
+            for g, ph in zip(self.df['Gene'], self.df[ptm_name[ptm_type]]):
                 ptm_site = ph.split(':')[1]
                 ptm_build = re.sub('[A-Z]+', lambda m: '_'+m.group(0), ptm_site.upper())[1:]
                 anno.append('{0}|{0}_{1}{2}'.format(g, ptm_type, ptm_build))
@@ -315,21 +398,8 @@ class CDAPPrecursorAreaTable(CDAPTable):
     """ + BASE_ATTR
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-    
-    def clean_values(self):
-        """Intensity values are log transformed and cleaned of `np.inf`
-        
-        Parameters
-        ----------
-        None
-        
-        Returns
-        -------
-        None
-        """
-        self.df = np.log2(self.df)
-        self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        return
+        if not self.use_ruler:
+            self.log_transform()
 
 
 class MaxQuantProteomeTable(MSTable):

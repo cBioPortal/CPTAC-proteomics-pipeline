@@ -1,8 +1,6 @@
 # ignore these
-download/
-refseq/
-data/
-resources/
 *.*~
 *.pyc
-*.tsv
+__pycache__/
+meta_*.txt
+data_*.txt
