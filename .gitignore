@@ -4,3 +4,4 @@
 __pycache__/
 meta_*.txt
 data_*.txt
+.ipynb_checkpoints/
